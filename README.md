@@ -253,14 +253,3 @@ A row is flagged as not effectively malicious if:
 
 ### Hard-Rule Overrides
 Even when the LLM is too permissive, deterministic post-processing rejects rows where notes indicate trivial mutations, parse failures, trapped payloads, or ineffective injection attempts.
-
----
-
-## Integration Points
-
-This module is designed to slot into the broader adversarial pipeline alongside:
-
-- **T1/T2 generators** — upstream sample producers
-- **Syntax validator** — SQL parse checking
-- **Sandbox validator** — runtime maliciousness testing
-- **Adversarial training pipeline** — downstream consumer of accepted samples
