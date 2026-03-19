@@ -1,0 +1,5 @@
+pandas
+pydantic>=2.6.0
+python-dotenv
+requests
+tqdm
