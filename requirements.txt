@@ -4,3 +4,5 @@ python-dotenv
 requests
 tqdm
 sqlglot
+matplotlib
+scikit-learn

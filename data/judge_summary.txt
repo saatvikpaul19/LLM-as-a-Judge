@@ -1,0 +1,10 @@
+Input rows: 146
+Accepted rows: 110
+Rejected rows: 36
+Acceptance rate: 75.34%
+Judge-stage rejects: 0
+Sandbox-stage rejects: 36
+Accepted CSV: data\accepted_candidates.csv
+Rejected CSV: data\rejected_candidates.csv
+All-results CSV: data\judge_results.csv
+Errors captured: 0

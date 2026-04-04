@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import argparse
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -22,12 +23,6 @@ from utils import (
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-INPUT_PATH = BASE_DIR / "data" / "generated_payloads.csv"
-ACCEPTED_PATH = BASE_DIR / "data" / "adversarial_dataset.csv"
-REJECTED_PATH = BASE_DIR / "data" / "mutation_queue.json"
-ALL_RESULTS_PATH = BASE_DIR / "data" / "judge_results.csv"
-SUMMARY_PATH = BASE_DIR / "data" / "judge_summary.txt"
-
 
 FINAL_ACCEPTED_COLUMNS = [
     "query_id",
@@ -51,19 +46,60 @@ FINAL_ACCEPTED_COLUMNS = [
     "judge_reason",
 ]
 
+FINAL_REJECTED_COLUMNS = [
+    "query_id",
+    "seed_payload",
+    "payload",
+    "full_query",
+    "attack_category",
+    "template_context",
+    "failure_stage",
+    "failure_reason",
+    "codebert_score",
+    "mutation_count",
+    "hint",
+]
+
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", choices=["heuristic", "ollama_local"], default="ollama_local")
-    parser.add_argument("--input", default=str(INPUT_PATH))
-    parser.add_argument("--accepted", default=str(ACCEPTED_PATH))
-    parser.add_argument("--rejected", default=str(REJECTED_PATH))
-    parser.add_argument("--all-results", default=str(ALL_RESULTS_PATH))
-    parser.add_argument("--summary", default=str(SUMMARY_PATH))
+    parser = argparse.ArgumentParser(
+        description="Run LLM-as-a-Judge on one teammate-generated CSV and split it into accepted and rejected CSV files."
+    )
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Teammate-generated candidate CSV input.",
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["heuristic", "ollama_local"],
+        default="ollama_local",
+        help="Judge backend. Default: ollama_local",
+    )
+    parser.add_argument(
+        "--accepted",
+        default=str(BASE_DIR / "data" / "accepted_candidates.csv"),
+        help="Accepted output CSV path.",
+    )
+    parser.add_argument(
+        "--rejected",
+        default=str(BASE_DIR / "data" / "rejected_candidates.csv"),
+        help="Rejected output CSV path.",
+    )
+    parser.add_argument(
+        "--all-results",
+        default=str(BASE_DIR / "data" / "judge_results.csv"),
+        help="All judge results CSV path.",
+    )
+    parser.add_argument(
+        "--summary",
+        default=str(BASE_DIR / "data" / "judge_summary.txt"),
+        help="Basic run summary text file path.",
+    )
     return parser.parse_args()
 
 
-def _accepted_row(row, result):
+def _accepted_row(row: dict, result: JudgeResult) -> dict:
     return {
         "query_id": row["query_id"],
         "payload": row["payload"],
@@ -87,9 +123,10 @@ def _accepted_row(row, result):
     }
 
 
-def _reject_row(row, stage, reason):
-    reject = {
+def _reject_row(row: dict, stage: str, reason: str) -> dict:
+    return {
         "query_id": row["query_id"],
+        "seed_payload": row["seed_payload"] if row.get("seed_payload_available") else "",
         "payload": row["payload"],
         "full_query": row["full_query"],
         "attack_category": row["llm_attack_category"],
@@ -100,14 +137,12 @@ def _reject_row(row, stage, reason):
         "mutation_count": row["mutation_count"],
         "hint": rejection_hint(stage),
     }
-    if row.get("seed_payload_available"):
-        reject["seed_payload"] = row["seed_payload"]
-    return reject
 
 
-def _all_result_row(row, parsed, backend_used, status):
-    out = {
+def _all_result_row(row: dict, parsed: dict, backend_used: str, status: str) -> dict:
+    return {
         "query_id": row["query_id"],
+        "seed_payload": row["seed_payload"] if row.get("seed_payload_available") else "",
         "payload": row["payload"],
         "full_query": row["full_query"],
         "llm_attack_category": row["llm_attack_category"],
@@ -130,14 +165,10 @@ def _all_result_row(row, parsed, backend_used, status):
         "backend": backend_used,
         "status": status,
     }
-    if row.get("seed_payload_available"):
-        out["seed_payload"] = row["seed_payload"]
-    return out
 
 
 def main():
     args = parse_args()
-    system_prompt = load_system_prompt()
 
     input_path = Path(args.input)
     accepted_path = Path(args.accepted)
@@ -145,29 +176,42 @@ def main():
     all_results_path = Path(args.all_results)
     summary_path = Path(args.summary)
 
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+
+    if input_path.resolve() == accepted_path.resolve():
+        raise ValueError("Accepted output path cannot be the same as the input path.")
+    if input_path.resolve() == rejected_path.resolve():
+        raise ValueError("Rejected output path cannot be the same as the input path.")
+    if input_path.resolve() == all_results_path.resolve():
+        raise ValueError("All-results output path cannot be the same as the input path.")
+
+    system_prompt = load_system_prompt()
+
     df = pd.read_csv(input_path, dtype=str).fillna("")
     rows = [normalize_candidate_row(record) for record in df.to_dict(orient="records")]
 
-    accepted_rows = []
-    rejected_rows = []
-    all_rows = []
-    errors = []
+    accepted_rows: list[dict] = []
+    rejected_rows: list[dict] = []
+    all_rows: list[dict] = []
+    errors: list[dict] = []
 
     for row in tqdm(rows, desc="Judging candidates"):
         try:
             if row["existing_failure_stage"] and row["existing_failure_reason"]:
-                stage = row["existing_failure_stage"]
-                reason = row["existing_failure_reason"]
-                rejected_rows.append(_reject_row(row, stage, reason))
+                rejected_rows.append(
+                    _reject_row(row, row["existing_failure_stage"], row["existing_failure_reason"])
+                )
                 continue
 
             if not row["ast_is_valid"] or not row["sandbox_executed"]:
                 stage = "sandbox"
                 reason = sandbox_failure_reason(row)
                 rejected_rows.append(_reject_row(row, stage, reason))
-                heuristic_result, backend_used = heuristic_judge(row)
+
+                heuristic_result, heuristic_backend = heuristic_judge(row)
                 heuristic_result = apply_hard_rules(row, heuristic_result)
-                all_rows.append(_all_result_row(row, heuristic_result, backend_used, "rejected_pre_judge"))
+                all_rows.append(_all_result_row(row, heuristic_result, heuristic_backend, "rejected_pre_judge"))
                 continue
 
             if args.backend == "heuristic":
@@ -180,10 +224,10 @@ def main():
                     parsed = extract_json(raw_response)
                     parsed = apply_hard_rules(row, parsed)
                     backend_used = "ollama_local+rules"
-                except Exception:
+                except Exception as exc:
                     parsed, _ = heuristic_judge(row)
                     parsed = apply_hard_rules(row, parsed)
-                    backend_used = "heuristic_fallback+rules"
+                    backend_used = f"heuristic_fallback+rules ({exc.__class__.__name__})"
 
             result = JudgeResult(**parsed)
             all_rows.append(_all_result_row(row, parsed, backend_used, "ok"))
@@ -196,53 +240,45 @@ def main():
         except Exception as exc:
             errors.append({"query_id": row.get("query_id", ""), "error": str(exc)})
             rejected_rows.append(
-                _reject_row(
-                    row,
-                    "judge",
-                    f"Judge failed to process the candidate cleanly. Error: {exc}",
-                )
+                _reject_row(row, "judge", f"Judge failed to process the candidate cleanly. Error: {exc}")
             )
 
     accepted_df = pd.DataFrame(accepted_rows, columns=FINAL_ACCEPTED_COLUMNS)
+    rejected_df = pd.DataFrame(rejected_rows, columns=FINAL_REJECTED_COLUMNS)
     all_results_df = pd.DataFrame(all_rows)
 
-    accepted_path.parent.mkdir(parents=True, exist_ok=True)
-    rejected_path.parent.mkdir(parents=True, exist_ok=True)
-    all_results_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    for path in [accepted_path, rejected_path, all_results_path, summary_path]:
+        path.parent.mkdir(parents=True, exist_ok=True)
 
     accepted_df.to_csv(accepted_path, index=False)
-
-    with rejected_path.open("w", encoding="utf-8") as handle:
-        json.dump(rejected_rows, handle, indent=2, ensure_ascii=False)
+    rejected_df.to_csv(rejected_path, index=False)
 
     if not all_results_df.empty:
         all_results_df.to_csv(all_results_path, index=False)
 
-    accepted_count = len(accepted_rows)
-    rejected_count = len(rejected_rows)
-    total_count = accepted_count + rejected_count
     judge_reject_count = sum(1 for row in rejected_rows if row["failure_stage"] == "judge")
     sandbox_reject_count = sum(1 for row in rejected_rows if row["failure_stage"] == "sandbox")
+    total = len(accepted_rows) + len(rejected_rows)
+    acceptance_rate = (len(accepted_rows) / total * 100.0) if total else 0.0
 
-    lines = [
+    summary_lines = [
         f"Input rows: {len(rows)}",
-        f"Accepted rows: {accepted_count}",
-        f"Rejected rows: {rejected_count}",
-        f"Acceptance rate: {(accepted_count / total_count):.2%}" if total_count else "Acceptance rate: 0.00%",
+        f"Accepted rows: {len(accepted_rows)}",
+        f"Rejected rows: {len(rejected_rows)}",
+        f"Acceptance rate: {acceptance_rate:.2f}%",
         f"Judge-stage rejects: {judge_reject_count}",
         f"Sandbox-stage rejects: {sandbox_reject_count}",
-        f"Accepted dataset: {accepted_path}",
-        f"Rejected queue: {rejected_path}",
-        f"Full judge results: {all_results_path}",
+        f"Accepted CSV: {accepted_path}",
+        f"Rejected CSV: {rejected_path}",
+        f"All-results CSV: {all_results_path}",
         f"Errors captured: {len(errors)}",
     ]
-    summary_text = "\n".join(lines)
+    summary_text = "\n".join(summary_lines)
     summary_path.write_text(summary_text, encoding="utf-8")
-
     print(summary_text)
+
     if errors:
-        print("\nSome rows produced exceptions and were pushed to the reject queue.")
+        print("\nSome rows produced exceptions and were pushed to the rejected output.")
 
 
 if __name__ == "__main__":
