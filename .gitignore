@@ -1,12 +1,3 @@
 .venv/
 __pycache__/
 *.pyc
-.env
-.pytest_cache/
-.idea/
-.vscode/
-.DS_Store
-data/judge_results.csv
-data/judge_errors.csv
-data/t3_metrics_summary.md
-data/t3_metrics_summary.txt
