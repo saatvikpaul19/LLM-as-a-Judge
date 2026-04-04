@@ -11,11 +11,11 @@ class JudgeResult(BaseModel):
 
     @field_validator("reason")
     @classmethod
-    def reason_not_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
+    def reason_not_empty(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
             raise ValueError("reason cannot be empty")
-        return v
+        return value
 
     @model_validator(mode="after")
     def validate_keep_logic(self):

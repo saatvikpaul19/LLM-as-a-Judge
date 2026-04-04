@@ -1,4 +1,4 @@
-import re
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -7,189 +7,153 @@ import sqlglot
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 INPUT_PATH = BASE_DIR / "data" / "generated_payloads.csv"
-OUTPUT_PATH = BASE_DIR / "data" / "judge_samples_from_t2.csv"
-
-context_map = {
-    "login": "login",
-    "search": "search",
-    "user_lookup": "id_lookup",
-    "order_filter": "product_filter",
-    "comment_insert": "profile_update",
-}
+OUTPUT_PATH = BASE_DIR / "data" / "generated_payloads_prepared.csv"
 
 
-def safe_parse_sql(query: str) -> bool:
+def safe_parse_sql(query: str):
     try:
-        sqlglot.parse_one(str(query))
-        return True
+        parsed = sqlglot.parse_one(str(query))
+        return True, parsed
     except Exception:
-        return False
+        return False, None
 
 
-def normalize_text(text: str) -> str:
-    return str(text).strip().lower()
+def extract_node_names(parsed) -> list[str]:
+    if parsed is None:
+        return []
+    return sorted({node.__class__.__name__ for node in parsed.walk()})
 
 
 def payload_inside_quotes_only(payload: str, full_query: str) -> bool:
-    """
-    Detects whether the payload appears to be fully trapped inside a quoted string
-    rather than breaking out into executable SQL structure.
-    """
     payload = str(payload)
-    full_query = str(full_query)
-
-    # simple quoted containment checks
-    patterns = [
-        f"'{payload}'",
-        f'"{payload}"',
-        f"%{payload}%",
+    full_query = str(full_query).lower()
+    checks = [
+        f"'{payload.lower()}'",
+        f'"{payload.lower()}"',
+        f"%{payload.lower()}%",
+        f"like '%{payload.lower()}%'",
     ]
-    lowered = full_query.lower()
-    for p in patterns:
-        if p.lower() in lowered:
-            return True
-
-    # common LIKE pattern where payload remains inside string
-    if f"like '%{payload.lower()}%'" in lowered:
-        return True
-
-    return False
+    return any(check in full_query for check in checks)
 
 
-def has_sqli_signal(payload: str, full_query: str, attack_category: str) -> bool:
-    payload_l = normalize_text(payload)
-    query_l = normalize_text(full_query)
-    category_l = normalize_text(attack_category)
+def derive_sandbox_fields(payload: str, full_query: str, attack_category: str, ast_is_valid: bool):
+    payload_l = str(payload).lower()
+    full_query_l = str(full_query).lower()
+    category_l = str(attack_category).lower()
 
-    generic_markers = [
-        "' or ",
-        '" or ',
-        "' and ",
-        '" and ',
-        " union select",
-        " union all select",
+    if not ast_is_valid:
+        return False, "ast_invalid", ""
+
+    if payload_inside_quotes_only(payload, full_query):
+        return False, "quoted_only", ""
+
+    category_to_exploit = {
+        "tautology": "tautology",
+        "union_based": "union_based",
+        "blind_boolean": "blind_boolean",
+        "blind_time": "blind_time",
+        "stacked_queries": "stacked_queries",
+        "comment_obfuscation": "comment_obfuscation",
+        "encoding_obfuscation": "encoding_obfuscation",
+        "nested_injection": "nested_injection",
+    }
+
+    suspicious_markers = [
+        " or ",
+        " and ",
+        " union ",
         "--",
         "/*",
         "*/",
         ";",
         "sleep(",
         "benchmark(",
+        "waitfor",
         "information_schema",
         "drop table",
         "xp_cmdshell",
     ]
 
-    category_markers = {
-        "tautology": [" or 1=1", " and 1=1", "' or '1'='1", '" or "1"="1'],
-        "union": [" union select", " union all select"],
-        "blind": [" and ", " or ", "sleep(", "benchmark(", "case when", "if("],
-        "boolean": [" and ", " or ", "1=1", "1=2"],
-        "stacked": [";"],
-        "comment": ["--", "/*", "*/", "#"],
-    }
+    sandbox_pass = any(marker in payload_l or marker in full_query_l for marker in suspicious_markers)
+    exploit_type = category_to_exploit.get(category_l, category_l if sandbox_pass else "")
+    detection_mode = "complete_query" if sandbox_pass else "no_exploit"
 
-    # generic signal
-    if any(m in payload_l for m in generic_markers):
-        return True
-
-    # category-aware signal
-    for key, markers in category_markers.items():
-        if key in category_l and any(m in payload_l or m in query_l for m in markers):
-            return True
-
-    return False
-
-
-def derive_sandbox_malicious(payload: str, full_query: str, attack_category: str, syntax_valid: bool) -> bool:
-    if not syntax_valid:
-        return False
-
-    # if the payload is only trapped inside quotes, treat it as not effectively malicious
-    if payload_inside_quotes_only(payload, full_query):
-        return False
-
-    # require at least some SQLi signal
-    if not has_sqli_signal(payload, full_query, attack_category):
-        return False
-
-    return True
-
-
-def derive_notes(row: pd.Series, syntax_valid: bool, sandbox_malicious: bool) -> str:
-    notes = [
-        f"attack_category={row['attack_category']}",
-        f"source={row['source']}",
-        f"generator_model={row['generator_model']}",
-    ]
-
-    payload = normalize_text(row["payload"])
-    full_query = normalize_text(row["full_query"])
-
-    if payload_inside_quotes_only(row["payload"], row["full_query"]):
-        notes.append("payload_inside_quotes_only")
-
-    if not syntax_valid:
-        notes.append("parse_failed")
-
-    if not sandbox_malicious:
-        notes.append("not_effectively_malicious")
-
-    if payload == full_query:
-        notes.append("same_as_full_query")
-
-    return "; ".join(notes)
+    return sandbox_pass, detection_mode, exploit_type
 
 
 def main():
     df = pd.read_csv(INPUT_PATH)
-
-    # Keep malicious rows if label exists
     if "label" in df.columns:
         df = df[df["label"] == 1].copy()
 
-    df["context"] = df["template_context"].map(context_map).fillna("search")
+    has_real_sandbox = {
+        "sandbox_executed",
+        "sandbox_detection_mode",
+        "sandbox_exploit_type",
+    }.issubset(df.columns)
 
-    syntax_flags = []
-    sandbox_flags = []
-    notes_list = []
-
-    for _, row in df.iterrows():
-        full_query = str(row["full_query"])
+    rows = []
+    for idx, row in df.iterrows():
+        query_id = f"q{idx:05d}"
         payload = str(row["payload"])
-        attack_category = str(row["attack_category"])
+        full_query = str(row.get("full_query", ""))
+        attack_category = str(row.get("attack_category", row.get("llm_attack_category", "unknown")))
+        template_context = str(row.get("template_context", "search"))
 
-        syntax_valid = safe_parse_sql(full_query)
-        sandbox_malicious = derive_sandbox_malicious(
-            payload=payload,
-            full_query=full_query,
-            attack_category=attack_category,
-            syntax_valid=syntax_valid,
-        )
+        ast_is_valid, parsed = safe_parse_sql(full_query)
+        ast_node_set = extract_node_names(parsed)
 
-        notes = derive_notes(row, syntax_valid, sandbox_malicious)
+        if has_real_sandbox:
+            sandbox_executed = str(row["sandbox_executed"]).strip().lower() in {"true", "1", "yes", "y"}
+            sandbox_detection_mode = str(row["sandbox_detection_mode"])
+            sandbox_exploit_type = str(row["sandbox_exploit_type"])
+            sandbox_source = "upstream_real"
+        else:
+            sandbox_executed, sandbox_detection_mode, sandbox_exploit_type = derive_sandbox_fields(
+                payload=payload,
+                full_query=full_query,
+                attack_category=attack_category,
+                ast_is_valid=ast_is_valid,
+            )
+            sandbox_source = "heuristic_proxy"
 
-        syntax_flags.append(str(syntax_valid).lower())
-        sandbox_flags.append(str(sandbox_malicious).lower())
-        notes_list.append(notes)
+        notes = []
+        if payload_inside_quotes_only(payload, full_query):
+            notes.append("payload_inside_quotes_only")
+        if not ast_is_valid:
+            notes.append("parse_failed")
+        if not sandbox_executed:
+            notes.append("not_effectively_malicious")
 
-    out = pd.DataFrame({
-        "id": range(1, len(df) + 1),
-        "seed_query": df["payload"].astype(str),
-        "candidate_query": df["full_query"].astype(str),
-        "context": df["context"].astype(str),
-        "syntax_valid": syntax_flags,
-        "sandbox_malicious": sandbox_flags,
-        "notes": notes_list,
-    })
+        out_row = {
+            "query_id": query_id,
+            "payload": payload,
+            "full_query": full_query,
+            "attack_category": attack_category,
+            "template_context": template_context,
+            "label": 1,
+            "mutation_count": 1,
+            "codebert_score": 0.0,
+            "ast_is_valid": ast_is_valid,
+            "ast_dialect": "default",
+            "ast_node_set": json.dumps(ast_node_set, ensure_ascii=False),
+            "sandbox_executed": sandbox_executed,
+            "sandbox_detection_mode": sandbox_detection_mode,
+            "sandbox_exploit_type": sandbox_exploit_type,
+            "sandbox_source": sandbox_source,
+            "notes": "; ".join(notes),
+        }
 
+        if "seed_payload" in row and pd.notna(row.get("seed_payload")):
+            out_row["seed_payload"] = str(row.get("seed_payload"))
+        elif "seed_query" in row and pd.notna(row.get("seed_query")):
+            out_row["seed_payload"] = str(row.get("seed_query"))
+
+        rows.append(out_row)
+
+    out = pd.DataFrame(rows)
     out.to_csv(OUTPUT_PATH, index=False)
     print(f"Saved {len(out)} rows to {OUTPUT_PATH}")
-
-    print("\nDerived stats:")
-    print("syntax_valid=true:", (out["syntax_valid"] == "true").sum())
-    print("syntax_valid=false:", (out["syntax_valid"] == "false").sum())
-    print("sandbox_malicious=true:", (out["sandbox_malicious"] == "true").sum())
-    print("sandbox_malicious=false:", (out["sandbox_malicious"] == "false").sum())
 
 
 if __name__ == "__main__":

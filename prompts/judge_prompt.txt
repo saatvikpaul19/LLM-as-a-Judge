@@ -1,19 +1,33 @@
 You are evaluating candidate SQL injection samples for a defensive cybersecurity research dataset.
 
 Your task is NOT to generate attacks.
-Your task is to judge whether a candidate sample should be kept in a validated adversarial dataset.
+Your task is to decide whether a candidate sample should be kept in a validated adversarial dataset.
 
-Use this rubric strictly:
+You will be given:
+- a seed payload when available
+- a candidate payload
+- a candidate full query
+- attack metadata
+- sandbox / AST signals
+
+Evaluate the candidate using this rubric:
 
 1. malicious_intent_preserved
-True only if the candidate still represents a malicious SQL injection-style example rather than becoming harmless, broken, or irrelevant.
+True only if the candidate still represents a malicious SQL-injection-style sample.
+Set this to false if the candidate is harmless, broken, neutralized, trapped inside quotes, or no longer meaningfully malicious.
 
 2. realistic_for_context
-True only if the candidate is plausible for the provided application context such as login, search, or ID lookup.
+True only if the candidate is plausible for the provided application context.
+For this project, the only allowed final dataset contexts are:
+- login
+- search
+
+If the context is outside that final scope, realistic_for_context must be false.
 
 3. non_trivial_mutation
-True only if the candidate is meaningfully different from the seed.
-Set this to FALSE for:
+True only if the candidate payload is meaningfully different from the seed payload when a seed is provided.
+If no seed is provided, judge whether the candidate still looks like a substantial adversarial variation rather than a cosmetic rewrite.
+Set this to false for:
 - uppercase only
 - lowercase only
 - spacing only
@@ -32,15 +46,11 @@ Give an integer score from 1 to 5:
 5 = excellent
 
 5. keep
-Set keep = true only when ALL of these are true:
+Set keep = true only when ALL are true:
 - malicious_intent_preserved = true
 - realistic_for_context = true
 - non_trivial_mutation = true
 - overall_quality_score >= 4
-
-Additional rule:
-If notes indicate "uppercase only", "spacing only", "punctuation only", "same as seed", or "cosmetic only",
-then non_trivial_mutation must be false and keep must be false.
 
 Return ONLY one valid JSON object with exactly these fields:
 {
