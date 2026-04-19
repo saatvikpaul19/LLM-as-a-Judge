@@ -288,7 +288,7 @@ def heuristic_judge(row: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
     )
 
     non_trivial_mutation = True
-    if sim is not None and sim >= 0.93:
+    if sim is not None and sim >= 0.92:
         non_trivial_mutation = False
     if _contains_any(joined, TRIVIAL_MUTATION_KEYWORDS):
         non_trivial_mutation = False
@@ -300,7 +300,7 @@ def heuristic_judge(row: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
         score -= 1
     if not non_trivial_mutation:
         score -= 1
-    if sim is not None and sim >= 0.97:
+    if sim is not None and sim >= 0.96:
         score -= 1
     score = max(1, min(5, score))
 
